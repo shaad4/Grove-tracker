@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TenantDesk Roadmap Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: #f8fafc;
+        }
+
+        .custom-checkbox {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #cbd5e1;
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+            background: white;
+        }
+
+        .custom-checkbox:checked {
+            background-color: #6366f1;
+            border-color: #6366f1;
+        }
+
+        .custom-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+        }
+
+        .feature-row.completed {
+            opacity: 0.7;
+        }
+
+        .feature-row.completed .feat-name {
+            text-decoration: line-through;
+            color: #64748b;
+        }
+
+        .progress-transition {
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab-active {
+            border-bottom: 2px solid #6366f1;
+            color: #6366f1;
+        }
+        
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .accordion-content.open {
+            max-height: 5000px;
+        }
+
+        #toast {
+            visibility: hidden;
+            min-width: 200px;
+            background-color: #334155;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 12px;
+            position: fixed;
+            z-index: 100;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        #toast.show {
+            visibility: visible;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header & Global Progress -->
+        <header class="mb-8">
+            <div class="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900 tracking-tight">TenantDesk</h1>
+                    <p class="text-slate-500 font-medium">Product Development Roadmap</p>
+                </div>
+                <div class="text-right">
+                    <div class="flex items-center gap-3 mb-1">
+                        <span class="text-sm font-semibold text-slate-600">Overall Build Progress</span>
+                        <span id="global-perc" class="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">0%</span>
+                    </div>
+                    <div class="w-48 md:w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div id="global-progress-bar" class="h-full bg-indigo-600 progress-transition w-0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Actions & Filters -->
+            <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 pb-4">
+                <button onclick="switchTab('provider')" id="tab-provider" class="tab-active px-4 py-2 font-semibold text-sm transition-colors">Provider Dashboard</button>
+                <button onclick="switchTab('client')" id="tab-client" class="px-4 py-2 font-semibold text-sm text-slate-500 hover:text-slate-700 transition-colors">Client Portal</button>
+                
+                <div class="ml-auto flex items-center gap-4">
+                    <button onclick="copyForNotion()" class="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M4.668 4.028a1 1 0 0 1 .949-.028l13.116 6.558a1 1 0 0 1 .15 1.764L5.617 19.986a1 1 0 0 1-1.31-1.41l3.32-4.15a1 1 0 0 1 .782-.375h9.32a.5.5 0 0 0 0-1h-9.32a1 1 0 0 1-.782-.375l-3.32-4.15a1 1 0 0 1 .363-1.488Z"/></svg>
+                        Export for Notion
+                    </button>
+                    <button onclick="resetProgress()" class="text-xs font-medium text-slate-400 hover:text-red-500 transition-colors">Reset All</button>
+                </div>
+            </div>
+            
+            <!-- Phase Filters -->
+            <div id="phase-filters" class="flex flex-wrap gap-2 mt-4">
+                <button data-phase="all" class="phase-btn active bg-slate-900 text-white px-3 py-1 rounded-full text-xs font-medium">All Phases</button>
+                <button data-phase="core" class="phase-btn bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-medium hover:bg-slate-50">Core</button>
+                <button data-phase="rt" class="phase-btn bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-medium hover:bg-slate-50">Real-time</button>
+                <button data-phase="mvp" class="phase-btn bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-medium hover:bg-slate-50">MVP Polish</button>
+                <button data-phase="later" class="phase-btn bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-medium hover:bg-slate-50">Post-MVP</button>
+            </div>
+        </header>
+
+        <!-- Module Grid -->
+        <main id="modules-container" class="space-y-4">
+            <!-- Modules injected via JS -->
+        </main>
+
+        <footer class="mt-12 pt-8 border-t border-slate-200 text-center">
+            <p class="text-sm text-slate-400 italic">Progress is saved automatically to your local browser storage.</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">Copied Markdown for Notion!</div>
+
+    <script>
+        // Data Structures
+        const P = [
+            { id: 'p1', icon: "#EEEDFE", iconColor: "#534AB7", iconSvg: '<path d="M4 4h3v3H4zm5 0h3v3H9zm-5 5h3v3H4zm5 0h3v3H9z" fill="currentColor"/>', title: "Module 1 — Auth & onboarding", sub: "Provider account creation and access", features: [
+                { id: 'p1f1', n: "Provider signup", d: "Email, password, workspace slug registration", t: "core" },
+                { id: 'p1f2', n: "Email verification", d: "Confirm email before dashboard access", t: "core" },
+                { id: 'p1f3', n: "JWT login & logout", d: "Token-based session with invalidation on logout", t: "core" },
+                { id: 'p1f4', n: "Password reset", d: "Reset via email link", t: "core" },
+                { id: 'p1f5', n: "Profile setup", d: "Business name and logo upload on first login", t: "core" },
+                { id: 'p1f6', n: "Onboarding checklist", d: "Step-by-step guide to add first client and request", t: "mvp" },
+            ]},
+            { id: 'p2', icon: "#E1F5EE", iconColor: "#0F6E56", iconSvg: '<circle cx="8" cy="6" r="2.5" fill="currentColor"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.4" fill="none"/>', title: "Module 2 — Client management", sub: "Add, view, and control client accounts", features: [
+                { id: 'p2f1', n: "Add new client", d: "Name + email → auto-creates isolated portal", t: "core" },
+                { id: 'p2f2', n: "Send invite email", d: "Unique signup link scoped to provider's subdomain", t: "core" },
+                { id: 'p2f3', n: "Client list view", d: "Name, open requests, last active date", t: "core" },
+                { id: 'p2f4', n: "Deactivate client", d: "Freeze portal access without deleting data", t: "core" },
+                { id: 'p2f5', n: "Delete client", d: "Soft delete — data retained, access removed", t: "core" },
+                { id: 'p2f6', n: "Resend invite", d: "Re-send invite if client hasn't joined yet", t: "mvp" },
+                { id: 'p2f7', n: "Internal notes per client", d: "Private notes never visible to client", t: "mvp" },
+                { id: 'p2f8', n: "Client tags", d: "Label clients — retainer, one-time, priority", t: "mvp" },
+                { id: 'p2f9', n: "Client since + lifetime stats", d: "Join date, total requests, total delivered", t: "later" },
+            ]},
+            { id: 'p3', icon: "#FAEEDA", iconColor: "#854F0B", iconSvg: '<path d="M4 5h8M4 8h6M4 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', title: "Module 3 — Request management", sub: "Full request lifecycle control", features: [
+                { id: 'p3f1', n: "Unified request inbox", d: "All requests across all clients in one view", t: "core" },
+                { id: 'p3f2', n: "Filter & sort", d: "By client, status, date range", t: "core" },
+                { id: 'p3f3', n: "Status pipeline", d: "Received → In Review → In Progress → Delivered → Closed", t: "core" },
+                { id: 'p3f4', n: "Request activity log", d: "Every status change with timestamp and actor", t: "core" },
+                { id: 'p3f5', n: "Deliver files or links", d: "Attach deliverable when marking as Delivered", t: "core" },
+                { id: 'p3f6', n: "Internal notes on request", d: "Provider-only notes separate from client chat", t: "core" },
+                { id: 'p3f7', n: "Request due date", d: "Set expected delivery date per request", t: "mvp" },
+                { id: 'p3f8', n: "Flag a request", d: "Mark as urgent or needs follow-up", t: "mvp" },
+                { id: 'p3f9', n: "Bulk status update", d: "Select multiple requests, change status at once", t: "mvp" },
+                { id: 'p3f10', n: "Request categories", d: "Tag requests by type — design, dev, content", t: "later" },
+                { id: 'p3f11', n: "Recurring request templates", d: "Save common request types as reusable templates", t: "later" },
+            ]},
+            { id: 'p4', icon: "#E1F5EE", iconColor: "#0F6E56", iconSvg: '<path d="M3 5h10M3 9h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="11" cy="10" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/>', title: "Module 4 — Communication", sub: "Chat threads and reply tools", features: [
+                { id: 'p4f1', n: "Per-request chat thread", d: "Client and provider exchange messages within request", t: "core" },
+                { id: 'p4f2', n: "File sharing in chat", d: "Images, PDFs, docs attached to messages", t: "core" },
+                { id: 'p4f3', n: "Read receipts", d: "Know when client has seen your message", t: "rt" },
+                { id: 'p4f4', n: "Saved reply templates", d: "Store common responses, insert with one click", t: "mvp" },
+                { id: 'p4f5', n: "Message timestamps", d: "Full date and time on hover", t: "mvp" },
+            ]},
+            { id: 'p5', icon: "#E6F1FB", iconColor: "#185FA5", iconSvg: '<path d="M8 3a5 5 0 0 0-5 5v2L1.5 12h13L13 10V8a5 5 0 0 0-5-5z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M6.5 13a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1.3" fill="none"/>', title: "Module 5 — Notifications", sub: "Live feed and WebSocket events", features: [
+                { id: 'p5f1', n: "Live notification feed", d: "New requests, replies, status views pushed instantly", t: "rt" },
+                { id: 'p5f2', n: "Bell icon with unread count", d: "Badge clears on mark-as-read", t: "rt" },
+                { id: 'p5f3', n: "Per-notification read state", d: "Mark individual or all as read", t: "rt" },
+                { id: 'p5f4', n: "Feed filter by event type", d: "Show only new requests, only replies, etc.", t: "rt" },
+                { id: 'p5f5', n: "WebSocket connection indicator", d: "Live green dot shows channel is open", t: "rt" },
+                { id: 'p5f6', n: "Email fallback notification", d: "Email sent if provider is offline", t: "mvp" },
+            ]},
+            { id: 'p6', icon: "#F1EFE8", iconColor: "#5F5E5A", iconSvg: '<rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M6 8h4M6 11h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>', title: "Module 6 — Analytics", sub: "Dashboard stats and activity insights", features: [
+                { id: 'p6f1', n: "Stat strip", d: "Total clients, open requests, delivered this week", t: "mvp" },
+                { id: 'p6f2', n: "Recent activity feed", d: "Last 10 events across all clients", t: "mvp" },
+                { id: 'p6f3', n: "Request volume chart", d: "Received vs delivered over last 30 days", t: "later" },
+                { id: 'p6f4', n: "Average response time", d: "Per client and overall average", t: "later" },
+                { id: 'p6f5', n: "Inactive client alert", d: "Flag clients with no activity in 7+ days", t: "later" },
+            ]},
+            { id: 'p7', icon: "#EEEDFE", iconColor: "#534AB7", iconSvg: '<circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>', title: "Module 7 — Settings", sub: "Profile, branding, and preferences", features: [
+                { id: 'p7f1', n: "Business name & logo", d: "Shown to clients on their portal", t: "core" },
+                { id: 'p7f2', n: "Email & password update", d: "Standard account settings", t: "core" },
+                { id: 'p7f3', n: "White-label portal", d: "Client sees provider brand", t: "mvp" },
+                { id: 'p7f4', n: "Custom status labels", d: "Rename pipeline stages", t: "mvp" },
+                { id: 'p7f5', n: "Email notification preferences", d: "Choose when to get emailed", t: "mvp" },
+                { id: 'p7f6', n: "Subdomain change", d: "Update workspace slug", t: "later" },
+                { id: 'p7f7', n: "Danger zone", d: "Delete account with full data wipe", t: "later" },
+            ]},
+            { id: 'p8', icon: "#FAEEDA", iconColor: "#854F0B", iconSvg: '<path d="M4 12V6a4 4 0 0 1 8 0v6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="2" y="10" width="12" height="5" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/>', title: "Module 8 — Plan & billing", sub: "Free tier limits and upgrade flow", features: [
+                { id: 'p8f1', n: "Plan limit enforcement", d: "Free: 3 clients, 10 active requests", t: "core" },
+                { id: 'p8f2', n: "Soft limit prompt", d: "Friendly upgrade CTA at limit hit", t: "core" },
+                { id: 'p8f3', n: "Usage meters", d: "Clients and requests used shown in settings", t: "mvp" },
+                { id: 'p8f4', n: "Plan comparison UI", d: "What Pro unlocks vs Free", t: "mvp" },
+                { id: 'p8f5', n: "Stripe billing integration", d: "Live payment and invoice history", t: "later" },
+            ]}
+        ];
+
+        const C = [
+            { id: 'c1', icon: "#E1F5EE", iconColor: "#0F6E56", iconSvg: '<path d="M4 12V6a4 4 0 0 1 8 0v6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="2" y="10" width="12" height="5" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/>', title: "Module 1 — Auth & portal access", sub: "Invite-only access, no public signup", features: [
+                { id: 'c1f1', n: "Invite-link signup", d: "Client sets password via provider's link", t: "core" },
+                { id: 'c1f2', n: "Login to portal", d: "Scoped to provider's subdomain", t: "core" },
+                { id: 'c1f3', n: "Password reset", d: "Reset via email link", t: "core" },
+                { id: 'c1f4', n: "Logout", d: "Session cleared, redirects to login", t: "core" },
+            ]},
+            { id: 'c2', icon: "#EEEDFE", iconColor: "#534AB7", iconSvg: '<path d="M4 5h8M4 8h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="11" cy="11" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M13 13l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', title: "Module 2 — Request submission", sub: "Simple, jargon-free request form", features: [
+                { id: 'c2f1', n: "Submit new request", d: "Title, description, file attachments", t: "core" },
+                { id: 'c2f2', n: "File upload", d: "Drag and drop — size limit enforced", t: "core" },
+                { id: 'c2f3', n: "Submission confirmation", d: "Friendly 'We got it' screen", t: "core" },
+                { id: 'c2f4', n: "Edit before review", d: "Edit only while status is Received", t: "mvp" },
+                { id: 'c2f5', n: "Submit request modal", d: "Overlay form — clean UX", t: "mvp" },
+                { id: 'c2f6', n: "Request drafts", d: "Save half-written requests", t: "later" },
+            ]},
+            { id: 'c3', icon: "#FAEEDA", iconColor: "#854F0B", iconSvg: '<path d="M4 5h8M4 8h6M4 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>', title: "Module 3 — Request tracking", sub: "See status of every request clearly", features: [
+                { id: 'c3f1', n: "Request list view", d: "All own requests — isolated from others", t: "core" },
+                { id: 'c3f2', n: "Friendly status labels", d: "Humanized stage names (e.g. 'Ready for you')", t: "core" },
+                { id: 'c3f3', n: "Delivered files view", d: "Provider files visible on card", t: "core" },
+                { id: 'c3f4', n: "Request detail page", d: "Full history + chat on one page", t: "core" },
+                { id: 'c3f5', n: "Visual progress bar", d: "5-step journey bar on card", t: "mvp" },
+                { id: 'c3f6', n: "Filter by status", d: "Show only open, in progress, etc.", t: "mvp" },
+                { id: 'c3f7', n: "Closed request archive", d: "Read-only view of completed requests", t: "later" },
+            ]},
+            { id: 'c4', icon: "#E1F5EE", iconColor: "#0F6E56", iconSvg: '<path d="M3 5h10M3 9h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="11" cy="10" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/>', title: "Module 4 — Communication", sub: "Per-request chat with provider", features: [
+                { id: 'c4f1', n: "Per-request chat thread", d: "Scoped to the request — no global inbox", t: "core" },
+                { id: 'c4f2', n: "File attachments in chat", d: "Drop reference images in thread", t: "core" },
+                { id: 'c4f3', n: "Unread message indicator", d: "Blue dot on request card", t: "core" },
+                { id: 'c4f4', n: "Closed request lock", d: "Cannot message on closed request", t: "core" },
+                { id: 'c4f5', n: "Live message delivery", d: "Messages appear instantly", t: "rt" },
+            ]},
+            { id: 'c5', icon: "#E6F1FB", iconColor: "#185FA5", iconSvg: '<path d="M8 3a5 5 0 0 0-5 5v2L1.5 12h13L13 10V8a5 5 0 0 0-5-5z" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M6.5 13a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1.3" fill="none"/>', title: "Module 5 — Notifications", sub: "Live updates on request activity", features: [
+                { id: 'c5f1', n: "Bell icon with unread count", d: "Badge updates live", t: "rt" },
+                { id: 'c5f2', n: "Status change notification", d: "Push when stage changes", t: "rt" },
+                { id: 'c5f3', n: "Message notification", d: "Notified on provider reply", t: "rt" },
+                { id: 'c5f4', n: "Delivery notification", d: "Notified on file delivery", t: "rt" },
+                { id: 'c5f5', n: "Notification history", d: "Last 20 events in dropdown", t: "mvp" },
+            ]},
+            { id: 'c6', icon: "#F1EFE8", iconColor: "#5F5E5A", iconSvg: '<circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>', title: "Module 6 — Account settings", sub: "Personal preferences and security", features: [
+                { id: 'c6f1', n: "Update display name", d: "Name shown in chat and portal", t: "core" },
+                { id: 'c6f2', n: "Update password", d: "Standard password change", t: "core" },
+                { id: 'c6f3', n: "Email notification preferences", d: "Choose to get emailed vs in-app only", t: "mvp" },
+                { id: 'c6f4', n: "Notification quiet hours", d: "Pause emails during set hours", t: "later" },
+            ]},
+            { id: 'c7', icon: "#FCEBEB", iconColor: "#A32D2D", iconSvg: '<path d="M8 4v4M8 11v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.3" fill="none"/>', title: "Module 7 — Edge states", sub: "Handling of all non-standard states", features: [
+                { id: 'c7f1', n: "Empty state — no requests", d: "Friendly illustration and CTA", t: "core" },
+                { id: 'c7f2', n: "Portal deactivated state", d: "Message if client is deactivated", t: "core" },
+                { id: 'c7f3', n: "File not found state", d: "Graceful error on broken links", t: "mvp" },
+                { id: 'c7f4', n: "Session expired state", d: "Prompt to log back in", t: "mvp" },
+            ]}
+        ];
+
+        const tagMap = {
+            core: { label: "Core", class: "bg-indigo-50 text-indigo-700" },
+            rt: { label: "Real-time", class: "bg-emerald-50 text-emerald-700" },
+            mvp: { label: "MVP Polish", class: "bg-amber-50 text-amber-700" },
+            later: { label: "Post-MVP", class: "bg-slate-100 text-slate-600" }
+        };
+
+        // State Management
+        let currentTab = 'provider';
+        let currentPhase = 'all';
+        let completedFeatures = JSON.parse(localStorage.getItem('tenantdesk_progress')) || [];
+
+        function saveProgress() {
+            localStorage.setItem('tenantdesk_progress', JSON.stringify(completedFeatures));
+            updateGlobalProgress();
+        }
+
+        function toggleFeature(id) {
+            if (completedFeatures.includes(id)) {
+                completedFeatures = completedFeatures.filter(f => f !== id);
+            } else {
+                completedFeatures.push(id);
+            }
+            saveProgress();
+            renderModules();
+        }
+
+        function resetProgress() {
+            if (confirm("Clear all checked features? This cannot be undone.")) {
+                completedFeatures = [];
+                saveProgress();
+                renderModules();
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-provider').className = tab === 'provider' ? 'tab-active px-4 py-2 font-semibold text-sm transition-colors' : 'px-4 py-2 font-semibold text-sm text-slate-500 hover:text-slate-700 transition-colors';
+            document.getElementById('tab-client').className = tab === 'client' ? 'tab-active px-4 py-2 font-semibold text-sm transition-colors' : 'px-4 py-2 font-semibold text-sm text-slate-500 hover:text-slate-700 transition-colors';
+            renderModules();
+        }
+
+        function updateGlobalProgress() {
+            const allFeatures = [...P, ...C].flatMap(m => m.features);
+            const total = allFeatures.length;
+            const completedCount = completedFeatures.length;
+            const perc = total === 0 ? 0 : Math.round((completedCount / total) * 100);
+            
+            document.getElementById('global-perc').textContent = `${perc}%`;
+            document.getElementById('global-progress-bar').style.width = `${perc}%`;
+        }
+
+        // Notion Integration Logic
+        function copyForNotion() {
+            const data = currentTab === 'provider' ? P : C;
+            let markdown = `# TenantDesk Roadmap: ${currentTab === 'provider' ? 'Provider Dashboard' : 'Client Portal'}\n\n`;
+
+            data.forEach(mod => {
+                markdown += `## ${mod.title}\n`;
+                mod.features.forEach(f => {
+                    const isDone = completedFeatures.includes(f.id);
+                    markdown += `${isDone ? '- [x]' : '- [ ]'} **${f.n}**: ${f.d} (${tagMap[f.t].label})\n`;
+                });
+                markdown += `\n`;
+            });
+
+            // Browser clipboard copy fallback
+            const el = document.createElement('textarea');
+            el.value = markdown;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+
+            showToast();
+        }
+
+        function showToast() {
+            const toast = document.getElementById("toast");
+            toast.className = "show";
+            setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        // Rendering
+        function renderModules() {
+            const container = document.getElementById('modules-container');
+            const data = currentTab === 'provider' ? P : C;
+            container.innerHTML = '';
+
+            data.forEach(mod => {
+                const modFeatures = mod.features.filter(f => currentPhase === 'all' || f.t === currentPhase);
+                if (modFeatures.length === 0) return;
+
+                const completedInMod = mod.features.filter(f => completedFeatures.includes(f.id)).length;
+                const totalInMod = mod.features.length;
+                const modPerc = Math.round((completedInMod / totalInMod) * 100);
+
+                const modEl = document.createElement('div');
+                modEl.className = "bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow";
+                
+                let featuresHtml = modFeatures.map(f => `
+                    <div class="feature-row flex items-start gap-4 p-4 border-t border-slate-100 ${completedFeatures.includes(f.id) ? 'completed bg-slate-50/50' : ''}">
+                        <input type="checkbox" 
+                               class="custom-checkbox mt-1" 
+                               ${completedFeatures.includes(f.id) ? 'checked' : ''} 
+                               onchange="toggleFeature('${f.id}')">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="feat-name font-semibold text-slate-800 text-sm truncate">${f.n}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${tagMap[f.t].class}">${tagMap[f.t].label}</span>
+                            </div>
+                            <p class="feat-desc text-xs text-slate-500 leading-relaxed">${f.d}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+                modEl.innerHTML = `
+                    <div class="p-4 flex items-center gap-4 cursor-pointer select-none bg-white" onclick="toggleAccordion(this)">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style="background:${mod.icon}">
+                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" style="color:${mod.iconColor}">${mod.iconSvg}</svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-bold text-slate-900 truncate">${mod.title}</h3>
+                            <p class="text-xs text-slate-500 truncate">${mod.sub}</p>
+                        </div>
+                        <div class="text-right hidden sm:block">
+                            <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">${completedInMod}/${totalInMod} Tasks</div>
+                            <div class="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-slate-800 progress-transition" style="width: ${modPerc}%"></div>
+                            </div>
+                        </div>
+                        <svg class="chevron transition-transform duration-200 text-slate-400" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="accordion-content open">
+                        ${featuresHtml}
+                    </div>
+                `;
+                container.appendChild(modEl);
+            });
+        }
+
+        function toggleAccordion(header) {
+            const content = header.nextElementSibling;
+            const chevron = header.querySelector('.chevron');
+            content.classList.toggle('open');
+            chevron.classList.toggle('rotate-180');
+        }
+
+        // Filter Logic
+        document.getElementById('phase-filters').addEventListener('click', (e) => {
+            const btn = e.target.closest('.phase-btn');
+            if (!btn) return;
+
+            document.querySelectorAll('.phase-btn').forEach(b => {
+                b.className = "phase-btn bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-medium hover:bg-slate-50";
+            });
+            btn.className = "phase-btn active bg-slate-900 text-white px-3 py-1 rounded-full text-xs font-medium";
+            
+            currentPhase = btn.dataset.phase;
+            renderModules();
+        });
+
+        // Initialize
+        updateGlobalProgress();
+        renderModules();
+    </script>
+</body>
+</html>
