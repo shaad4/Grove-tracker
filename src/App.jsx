@@ -17,7 +17,7 @@ import {
   Info
 } from 'lucide-react';
 
-const __firebase_config = {
+const firebaseConfig = {
   apiKey: "AIzaSyCQuhG5hhuEwK67mGgkzEBlyxNUTI6dLNQ",
   authDomain: "groove-tracker.firebaseapp.com",
   projectId: "groove-tracker",
@@ -27,7 +27,6 @@ const __firebase_config = {
 }
 
 // --- Firebase Configuration ---
-const firebaseConfig = JSON.parse(__firebase_config);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
